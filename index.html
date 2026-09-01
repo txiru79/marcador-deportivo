@@ -1,0 +1,540 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover, user-scalable=no">
+<title>Marcador</title>
+<meta name="theme-color" content="#0a0e0f">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-192.png">
+<style>
+  :root{
+    --bg:#0a0e0f;
+    --panel:#111617;
+    --line:#242b2d;
+    --ink:#eef2f2;
+    --dim:#5b6669;
+    --a:#ff3b30;
+    --b:#00d9ff;
+    --accent:#ffd166;
+  }
+  *{ box-sizing:border-box; -webkit-tap-highlight-color:transparent; user-select:none; -webkit-user-select:none; }
+  html,body{
+    margin:0; padding:0; width:100%; height:100%;
+    background:var(--bg); color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    overflow:hidden; overscroll-behavior:none;
+  }
+  .app{ position:fixed; inset:0; width:100vw; height:100vh; display:flex; flex-direction:column; }
+
+  .tabbar{ flex:0 0 48px; display:flex; background:var(--bg); border-bottom:1px solid var(--line); padding-left:env(safe-area-inset-left); padding-right:env(safe-area-inset-right); }
+  .tab{ flex:1; background:none; border:none; color:var(--dim); font-family:inherit; font-size:11px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; display:flex; align-items:center; justify-content:center; border-bottom:3px solid transparent; }
+  .tab + .tab{ border-left:1px solid var(--line); }
+  .tab.active{ color:var(--ink); border-bottom-color:var(--accent); }
+  .tab[data-sport="futbol"].active{ border-bottom-color:#3fae46; }
+  .tab[data-sport="baloncesto"].active{ border-bottom-color:#e08a3a; }
+  .tab[data-sport="tenis"].active{ border-bottom-color:#b3763f; }
+  .tab[data-sport="pingpong"].active{ border-bottom-color:#2790db; }
+  .tab:focus-visible{ outline:2px solid var(--ink); outline-offset:-2px; }
+
+  .board{
+    flex:1; min-height:0; display:flex; position:relative;
+    box-shadow:inset 0 0 0 3px rgba(255,255,255,.14);
+    transition:background .35s ease;
+    padding-left:env(safe-area-inset-left); padding-right:env(safe-area-inset-right);
+  }
+  .board[data-sport="futbol"]{
+    background:
+      repeating-linear-gradient(90deg, rgba(255,255,255,.05) 0 36px, rgba(0,0,0,.05) 36px 72px),
+      linear-gradient(160deg,#2f9142,#1c6a2b);
+  }
+  .board[data-sport="baloncesto"]{
+    background:
+      repeating-linear-gradient(90deg, rgba(255,255,255,.045) 0 9px, rgba(0,0,0,.045) 9px 18px),
+      linear-gradient(160deg,#e08a3a,#a85420);
+  }
+  .board[data-sport="tenis"]{
+    background:
+      repeating-linear-gradient(45deg, rgba(255,255,255,.035) 0 7px, rgba(0,0,0,.035) 7px 14px),
+      linear-gradient(160deg,#b3763f,#7d4c26);
+  }
+  .board[data-sport="pingpong"]{
+    background: linear-gradient(160deg,#2790db,#124f87);
+  }
+
+  .panel{ flex:1; position:relative; display:flex; align-items:center; justify-content:center; padding:12px; overflow:hidden; }
+  .panel--a{ border-right:2px solid rgba(255,255,255,.5); }
+
+  .card{
+    position:relative; width:100%; height:100%; max-width:640px;
+    display:flex; flex-direction:column; align-items:center; overflow:hidden;
+    padding:1vh 2vw 1.4vh; border-radius:20px;
+    background:rgba(7,10,11,.72);
+    border:1px solid rgba(255,255,255,.08);
+    box-shadow:0 12px 30px rgba(0,0,0,.35);
+  }
+  .panel--a .score{ color:var(--a); text-shadow:0 0 1.4vh rgba(255,59,48,.4); }
+  .panel--b .score{ color:var(--b); text-shadow:0 0 1.4vh rgba(0,217,255,.4); }
+
+  .name{
+    font-size:clamp(13px,2.1vh,20px); font-weight:700; letter-spacing:.1em; text-transform:uppercase;
+    color:var(--dim); max-width:90%; text-align:center; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+    padding:.35em .8em; border-radius:8px; outline:none; user-select:text; -webkit-user-select:text; cursor:text;
+  }
+  .name:focus{ color:var(--ink); background:rgba(255,255,255,.05); box-shadow:0 0 0 2px var(--line); }
+
+  .score-row{ flex:1; min-height:0; width:100%; display:flex; align-items:center; gap:clamp(20px,5vw,44px); }
+  .panel--a .score-row{ flex-direction:row-reverse; }
+  .meta{ flex:0 0 auto; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px; font-size:clamp(10px,1.5vh,14px); color:var(--dim); letter-spacing:.06em; text-transform:uppercase; white-space:pre-line; text-align:center; line-height:1.5; min-width:clamp(70px,9vw,100px); }
+  .meta.empty{ display:none; }
+  .panel--a .meta{ border-left:1px solid var(--line); padding-left:14px; margin-right:clamp(20px,5vw,34px); }
+  .panel--b .meta{ border-right:1px solid var(--line); padding-right:14px; margin-left:clamp(20px,5vw,34px); }
+
+  .score-wrap{ flex:1; min-width:0; min-height:0; display:flex; align-items:center; justify-content:center; }
+  .score{ font-size:clamp(48px,min(18vh,20vw),200px); font-weight:800; line-height:1; font-variant-numeric:tabular-nums; text-align:center; text-shadow:0 0 1.4vh currentColor; }
+  .score.word{ font-size:clamp(24px,min(8vh,16vw),76px); letter-spacing:.02em; }
+  @media (prefers-reduced-motion:no-preference){ .score.pulse{ animation:scorePulse .26s ease-out; } }
+  @keyframes scorePulse{ 0%{transform:scale(1);filter:brightness(1);} 35%{transform:scale(1.09);filter:brightness(1.7);} 100%{transform:scale(1);filter:brightness(1);} }
+
+  .banner{
+    position:absolute; left:50%; top:50%; transform:translate(-50%,-50%) scale(.8);
+    font-size:clamp(18px,4.5vh,38px); font-weight:800; letter-spacing:.08em; text-transform:uppercase;
+    color:var(--accent); text-shadow:0 0 3vh rgba(255,209,102,.5);
+    opacity:0; pointer-events:none; transition:opacity .25s ease, transform .25s ease;
+  }
+  .banner.show{ opacity:1; transform:translate(-50%,-50%) scale(1); }
+  .banner.big{ font-size:clamp(22px,6vh,50px); text-shadow:0 0 4vh rgba(255,209,102,.65); }
+
+  .controls{ display:none; gap:8px; align-items:center; justify-content:center; margin-top:6px; }
+  .btn-point{ min-width:42px; height:38px; padding:0 10px; border-radius:10px; border:1px solid var(--line); background:rgba(255,255,255,.03); color:var(--ink); font-weight:700; font-size:13px; font-family:inherit; }
+  .btn-point:active{ background:rgba(255,255,255,.14); }
+
+  .undo{ margin-top:6px; width:38px; height:38px; border-radius:50%; border:1px solid var(--line); background:rgba(255,255,255,.03); color:var(--dim); font-size:16px; display:flex; align-items:center; justify-content:center; }
+  .undo:active{ color:var(--ink); background:rgba(255,255,255,.1); }
+
+  .center{ position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); z-index:5; display:flex; flex-direction:column; align-items:center; gap:8px; }
+  .ctrl-btn{ width:38px; height:38px; border-radius:50%; border:1px solid var(--line); background:var(--bg); color:var(--dim); font-size:16px; display:flex; align-items:center; justify-content:center; }
+  .ctrl-btn:active{ color:var(--ink); }
+  .reset{ width:42px; height:42px; font-size:19px; }
+
+  button{ font-family:inherit; }
+  button:focus-visible, .name:focus-visible{ outline:2px solid var(--ink); outline-offset:2px; }
+
+  .rotate-hint{
+    display:none; position:fixed; inset:0; z-index:20; background:var(--bg); color:var(--ink);
+    align-items:center; justify-content:center; flex-direction:column; gap:16px;
+    font-size:18px; font-weight:600; text-align:center; padding:0 10vw;
+  }
+  .rotate-hint span{ font-size:40px; }
+  @media (orientation:portrait){ .tabbar{display:none;} .board{ display:none; } .rotate-hint{ display:flex; } }
+</style>
+</head>
+<body>
+<div class="app" id="app">
+
+  <div class="rotate-hint">
+    <span>&#8635;</span>
+    Gira el dispositivo para ver el marcador
+  </div>
+
+  <div class="tabbar" role="tablist">
+    <button class="tab active" data-sport="futbol" role="tab" aria-selected="true">Fútbol</button>
+    <button class="tab" data-sport="baloncesto" role="tab" aria-selected="false">Baloncesto</button>
+    <button class="tab" data-sport="tenis" role="tab" aria-selected="false">Tenis</button>
+    <button class="tab" data-sport="pingpong" role="tab" aria-selected="false">Ping pong</button>
+  </div>
+
+  <div class="board">
+    <section class="panel panel--a tappable" id="panelA">
+     <div class="card">
+      <div class="name" id="nameA" contenteditable="true" spellcheck="false" maxlength="16">LOCAL</div>
+      <div class="score-row">
+        <div class="meta empty" id="metaA"></div>
+        <div class="score-wrap"><div class="score" id="scoreA">0</div></div>
+      </div>
+      <div class="banner" id="bannerA"></div>
+      <div class="controls" id="controlsA">
+        <button class="btn-point" data-team="a" data-value="1">+1</button>
+        <button class="btn-point" data-team="a" data-value="2">+2</button>
+        <button class="btn-point" data-team="a" data-value="3">+3</button>
+      </div>
+      <button class="undo" id="undoA" aria-label="Deshacer último punto de Local">&#8617;</button>
+     </div>
+    </section>
+
+    <div class="center">
+      <button class="ctrl-btn" id="swapBtn" aria-label="Cambiar de lado, intercambia Local y Visitante">&#8646;</button>
+      <button class="ctrl-btn reset" id="resetBtn" aria-label="Reiniciar marcador">&#8635;</button>
+    </div>
+
+    <section class="panel panel--b tappable" id="panelB">
+     <div class="card">
+      <div class="name" id="nameB" contenteditable="true" spellcheck="false" maxlength="16">VISITANTE</div>
+      <div class="score-row">
+        <div class="meta empty" id="metaB"></div>
+        <div class="score-wrap"><div class="score" id="scoreB">0</div></div>
+      </div>
+      <div class="banner" id="bannerB"></div>
+      <div class="controls" id="controlsB">
+        <button class="btn-point" data-team="b" data-value="1">+1</button>
+        <button class="btn-point" data-team="b" data-value="2">+2</button>
+        <button class="btn-point" data-team="b" data-value="3">+3</button>
+      </div>
+      <button class="undo" id="undoB" aria-label="Deshacer último punto de Visitante">&#8617;</button>
+     </div>
+    </section>
+  </div>
+
+</div>
+
+<script>
+(function(){
+  const panelA = document.getElementById('panelA');
+  const panelB = document.getElementById('panelB');
+  const board  = document.querySelector('.board');
+  const nameA  = document.getElementById('nameA');
+  const nameB  = document.getElementById('nameB');
+  const scoreEls   = { a: document.getElementById('scoreA'), b: document.getElementById('scoreB') };
+  const metaEls    = { a: document.getElementById('metaA'),  b: document.getElementById('metaB')  };
+  const bannerEls  = { a: document.getElementById('bannerA'),b: document.getElementById('bannerB') };
+  const controlsEls= { a: document.getElementById('controlsA'), b: document.getElementById('controlsB') };
+
+  function defaultState(sport){
+    if (sport === 'tenis') return { points:{a:0,b:0}, games:{a:0,b:0}, sets:{a:0,b:0}, tiebreak:false, tb:{a:0,b:0}, matchOver:false, winner:null, history:[] };
+    if (sport === 'pingpong') return { points:{a:0,b:0}, sets:{a:0,b:0}, matchOver:false, winner:null, history:[] };
+    return { points:{a:0,b:0}, history:[] }; // futbol y baloncesto
+  }
+
+  const MATCH_TARGET = { tenis: 2, pingpong: 3 }; // sets necesarios para ganar el partido
+
+  const matches = {
+    futbol: defaultState('futbol'),
+    baloncesto: defaultState('baloncesto'),
+    tenis: defaultState('tenis'),
+    pingpong: defaultState('pingpong')
+  };
+
+  const sportNames = { futbol:'fútbol', baloncesto:'baloncesto', tenis:'tenis', pingpong:'ping pong' };
+
+  let currentSport = 'futbol';
+
+  // Pantalla siempre encendida mientras se usa el marcador
+  let wakeLock = null;
+  async function requestWakeLock(){
+    try {
+      if ('wakeLock' in navigator){
+        wakeLock = await navigator.wakeLock.request('screen');
+      }
+    } catch (e) { /* no disponible en este navegador o sin permiso; se ignora */ }
+  }
+  requestWakeLock();
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') requestWakeLock();
+  });
+  document.addEventListener('pointerdown', requestWakeLock, { once:true });
+
+  // Vibracion y sonido breve al marcar
+  let audioCtx = null;
+  function playTick(big){
+    try {
+      audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.connect(gain); gain.connect(audioCtx.destination);
+      osc.type = 'sine';
+      osc.frequency.value = big ? 880 : 640;
+      const now = audioCtx.currentTime;
+      const dur = big ? 0.22 : 0.09;
+      gain.gain.setValueAtTime(0.0001, now);
+      gain.gain.exponentialRampToValueAtTime(0.16, now + 0.01);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + dur);
+      osc.start(now);
+      osc.stop(now + dur + 0.02);
+    } catch (e) { /* audio no disponible; se ignora */ }
+  }
+  function feedback(big){
+    if (navigator.vibrate){
+      try { navigator.vibrate(big ? [18,40,18] : 12); } catch (e) {}
+    }
+    playTick(big);
+  }
+
+  function pushHistory(sport){
+    const m = matches[sport];
+    const snap = JSON.parse(JSON.stringify(m));
+    delete snap.history;
+    m.history.push(snap);
+    if (m.history.length > 60) m.history.shift();
+  }
+
+  function undo(sport){
+    const m = matches[sport];
+    const prev = m.history.pop();
+    if (!prev) return;
+    Object.assign(m, prev);
+    if (navigator.vibrate){ try { navigator.vibrate(10); } catch (e) {} }
+    bannerEls.a.classList.remove('show');
+    bannerEls.b.classList.remove('show');
+    renderPanels();
+    renderControls();
+  }
+
+  function tennisLabel(mine, theirs){
+    const labels = ['0','15','30','40'];
+    if (mine === theirs && mine >= 3) return 'Iguales';
+    if (mine < 4 && theirs < 4) return labels[mine];
+    if (mine === theirs + 1) return 'Ventaja';
+    if (mine < theirs) return '40';
+    return labels[Math.min(mine,3)];
+  }
+
+  function showBanner(team, text, big){
+    feedback(!!big);
+    const el = bannerEls[team];
+    el.textContent = text;
+    el.classList.toggle('big', !!big);
+    el.classList.add('show');
+    clearTimeout(el._t);
+    el._t = setTimeout(() => el.classList.remove('show'), big ? 2600 : 1100);
+  }
+
+  function simplePoint(sport, team){
+    pushHistory(sport);
+    matches[sport].points[team] += 1;
+    feedback(false);
+    renderPanels(team);
+  }
+
+  function basketPoint(team, value){
+    pushHistory('baloncesto');
+    matches.baloncesto.points[team] += value;
+    feedback(false);
+    renderPanels(team);
+  }
+
+  function pingpongPoint(team){
+    pushHistory('pingpong');
+    const m = matches.pingpong;
+    const other = team === 'a' ? 'b' : 'a';
+    m.points[team] += 1;
+    if (m.points[team] >= 11 && m.points[team] - m.points[other] >= 2){
+      m.sets[team] += 1;
+      m.points = { a:0, b:0 };
+      if (m.sets[team] >= MATCH_TARGET.pingpong){
+        m.matchOver = true; m.winner = team;
+        showBanner(team, '¡Partido!', true);
+      } else {
+        showBanner(team, 'Set');
+      }
+    } else {
+      feedback(false);
+    }
+    renderPanels(team);
+    renderControls();
+  }
+
+  function finishTennisSet(team){
+    const m = matches.tenis;
+    m.sets[team] += 1;
+    m.games = { a:0, b:0 };
+    m.points = { a:0, b:0 };
+    if (m.sets[team] >= MATCH_TARGET.tenis){
+      m.matchOver = true; m.winner = team;
+      showBanner(team, '¡Partido!', true);
+    } else {
+      showBanner(team, 'Set');
+    }
+  }
+
+  function tenisPoint(team){
+    pushHistory('tenis');
+    const m = matches.tenis;
+    const other = team === 'a' ? 'b' : 'a';
+    let ended = false;
+
+    if (m.tiebreak){
+      m.tb[team] += 1;
+      if (m.tb[team] >= 7 && m.tb[team] - m.tb[other] >= 2){
+        m.games[team] += 1;
+        m.tiebreak = false;
+        m.tb = { a:0, b:0 };
+        finishTennisSet(team);
+        ended = true;
+      }
+    } else {
+      m.points[team] += 1;
+      if (m.points[team] >= 4 && m.points[team] - m.points[other] >= 2){
+        m.games[team] += 1;
+        m.points = { a:0, b:0 };
+        if (m.games[team] >= 6 && m.games[team] - m.games[other] >= 2){
+          finishTennisSet(team);
+        } else if (m.games.a === 6 && m.games.b === 6){
+          m.tiebreak = true;
+          m.tb = { a:0, b:0 };
+          feedback(false);
+        } else {
+          showBanner(team, 'Juego');
+        }
+        ended = true;
+      }
+    }
+    if (!ended) feedback(false);
+    renderPanels(team);
+    renderControls();
+  }
+
+  function scorePoint(team){
+    if (currentSport === 'futbol') simplePoint('futbol', team);
+    else if (currentSport === 'pingpong') pingpongPoint(team);
+    else if (currentSport === 'tenis') tenisPoint(team);
+  }
+
+  function pulse(el){
+    el.classList.remove('pulse');
+    void el.offsetWidth;
+    el.classList.add('pulse');
+  }
+
+  function renderPanels(justTeam){
+    const m = matches[currentSport];
+    ['a','b'].forEach(team => {
+      const other = team === 'a' ? 'b' : 'a';
+      let mainText = '0', isWord = false, metaText = '';
+
+      if (currentSport === 'futbol' || currentSport === 'baloncesto'){
+        mainText = String(m.points[team]);
+      } else if (currentSport === 'pingpong'){
+        mainText = String(m.points[team]);
+        metaText = 'Sets\n' + m.sets[team] + (m.matchOver && m.winner === team ? '\n¡Campeón!' : '');
+      } else if (currentSport === 'tenis'){
+        if (m.tiebreak){
+          mainText = String(m.tb[team]);
+        } else {
+          mainText = tennisLabel(m.points[team], m.points[other]);
+          isWord = isNaN(Number(mainText));
+        }
+        metaText = 'Sets ' + m.sets[team] + '\nJuegos ' + m.games[team] + (m.tiebreak ? '\nDesempate' : '') + (m.matchOver && m.winner === team ? '\n¡Campeón!' : '');
+      }
+
+      scoreEls[team].textContent = mainText;
+      scoreEls[team].classList.toggle('word', isWord);
+      metaEls[team].textContent = metaText;
+      metaEls[team].classList.toggle('empty', metaText === '');
+    });
+    if (justTeam) pulse(scoreEls[justTeam]);
+  }
+
+  function renderControls(){
+    board.dataset.sport = currentSport;
+    const showBasket = currentSport === 'baloncesto';
+    const m = matches[currentSport];
+    const over = !!(m && m.matchOver);
+    controlsEls.a.style.display = showBasket ? 'flex' : 'none';
+    controlsEls.b.style.display = showBasket ? 'flex' : 'none';
+    panelA.classList.toggle('tappable', !showBasket && !over);
+    panelB.classList.toggle('tappable', !showBasket && !over);
+  }
+
+  function updateTabs(){
+    document.querySelectorAll('.tab').forEach(btn => {
+      const active = btn.dataset.sport === currentSport;
+      btn.classList.toggle('active', active);
+      btn.setAttribute('aria-selected', active ? 'true' : 'false');
+    });
+  }
+
+  document.querySelectorAll('.tab').forEach(btn => {
+    btn.addEventListener('click', () => {
+      currentSport = btn.dataset.sport;
+      updateTabs();
+      renderControls();
+      renderPanels();
+      bannerEls.a.classList.remove('show');
+      bannerEls.b.classList.remove('show');
+    });
+  });
+
+  function isControl(target){
+    return target.closest('.name') || target.closest('.controls') || target.closest('.undo') || target.closest('.center');
+  }
+
+  panelA.addEventListener('click', e => { if (!isControl(e.target) && panelA.classList.contains('tappable')) scorePoint('a'); });
+  panelB.addEventListener('click', e => { if (!isControl(e.target) && panelB.classList.contains('tappable')) scorePoint('b'); });
+
+  document.querySelectorAll('.btn-point').forEach(btn => {
+    btn.addEventListener('click', e => {
+      e.stopPropagation();
+      basketPoint(btn.dataset.team, Number(btn.dataset.value));
+    });
+  });
+
+  document.getElementById('undoA').addEventListener('click', e => { e.stopPropagation(); undo(currentSport); });
+  document.getElementById('undoB').addEventListener('click', e => { e.stopPropagation(); undo(currentSport); });
+
+  function swapMatchState(m){
+    ['points','games','sets','tb'].forEach(key => {
+      if (m[key]){ const t = m[key].a; m[key].a = m[key].b; m[key].b = t; }
+    });
+    if (m.winner === 'a') m.winner = 'b';
+    else if (m.winner === 'b') m.winner = 'a';
+  }
+
+  document.getElementById('swapBtn').addEventListener('click', e => {
+    e.stopPropagation();
+    const tmpName = nameA.textContent;
+    nameA.textContent = nameB.textContent;
+    nameB.textContent = tmpName;
+    Object.keys(matches).forEach(sport => {
+      const m = matches[sport];
+      swapMatchState(m);
+      m.history.forEach(swapMatchState);
+    });
+    if (navigator.vibrate){ try { navigator.vibrate(10); } catch (err) {} }
+    renderPanels();
+  });
+
+  document.getElementById('resetBtn').addEventListener('click', e => {
+    e.stopPropagation();
+    if (confirm('¿Reiniciar el marcador de ' + sportNames[currentSport] + '?')){
+      matches[currentSport] = defaultState(currentSport);
+      renderPanels();
+      renderControls();
+    }
+  });
+
+  [nameA, nameB].forEach(el => {
+    el.addEventListener('focus', () => {
+      const range = document.createRange();
+      range.selectNodeContents(el);
+      const sel = window.getSelection();
+      sel.removeAllRanges();
+      sel.addRange(range);
+    });
+    el.addEventListener('keydown', e => { if (e.key === 'Enter'){ e.preventDefault(); el.blur(); } });
+    el.addEventListener('input', () => {
+      if (el.textContent.length > 16){
+        el.textContent = el.textContent.slice(0, 16);
+        // mover el cursor al final tras recortar el texto
+        const range = document.createRange();
+        const sel = window.getSelection();
+        range.selectNodeContents(el);
+        range.collapse(false);
+        sel.removeAllRanges();
+        sel.addRange(range);
+      }
+    });
+    el.addEventListener('blur', () => {
+      if (!el.textContent.trim()) el.textContent = el.id === 'nameA' ? 'LOCAL' : 'VISITANTE';
+    });
+  });
+
+  renderControls();
+  renderPanels();
+
+  if ('serviceWorker' in navigator){
+    navigator.serviceWorker.register('sw.js').catch(() => {});
+  }
+})();
+</script>
+</body>
+</html>
